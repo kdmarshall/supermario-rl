@@ -1,5 +1,6 @@
 import sys
 import gym
+import time
 import random
 import tensorflow as tf
 import tensorflow.contrib.slim as slim
@@ -18,10 +19,17 @@ def discount_rewards(r):
         discounted_r[t] = running_add
     return discounted_r
 
+def one_hot(index):
+    encoding = [0]*6
+    encoding[index] = 1
+    return encoding
+
 class Agent(object):
     def __init__(self, lr, s_size, a_size, h_size):
-        self.state_in = tf.placeholder(shape=[None, s_size],dtype=tf.float32)
-        hidden = slim.fully_connected(self.state_in, h_size, biases_initializer=None, activation_fn=tf.nn.relu)
+        self.state_in = tf.placeholder(shape=[None, s_size],dtype=tf.int8)
+        _input_node = tf.cast(self.state_in, dtype=tf.float32)
+        _input_node_scaled = tf.div(_input_node, 255.)
+        hidden = slim.fully_connected(_input_node_scaled, h_size, biases_initializer=None, activation_fn=tf.nn.relu)
         self.output = slim.fully_connected(hidden, a_size, activation_fn=tf.nn.softmax, biases_initializer=None)
         self.chosen_action = tf.argmax(self.output,1)
         self.reward_holder = tf.placeholder(shape=[None],dtype=tf.float32)
@@ -44,7 +52,7 @@ class Agent(object):
 
 tf.reset_default_graph() #Clear the Tensorflow graph.
 
-myAgent = Agent(lr=1e-2, s_size=4, a_size=6, h_size=8) #Load the agent.
+myAgent = Agent(lr=1e-2, s_size=172032, a_size=6, h_size=8) #Load the agent.
 
 total_episodes = 5000 #Set total number of episodes to train agent on.
 max_ep = 999
@@ -56,7 +64,7 @@ with tf.Session() as sess:
     sess.run(init)
     i = 0
     total_reward = []
-    total_lenght = []
+    total_length = []
         
     gradBuffer = sess.run(tf.trainable_variables())
     for ix,grad in enumerate(gradBuffer):
@@ -64,12 +72,35 @@ with tf.Session() as sess:
 
     while i < total_episodes:
         s = env.reset() #57344
-        print(s.shape)
-        s = np.reshape(s, (57344, 3))
-        print(s.shape)
-        s = s.T
-        print(s.shape)
-        print(s)
+        s = np.reshape(s, (172032,))#np.reshape(s, (57344, 3))
+        # s = s.T # (3, 57344)
         running_reward = 0
         ep_history = []
-        break
+        for j in range(max_ep):
+            #Probabilistically pick an action given our network outputs.
+            a_dist = sess.run(myAgent.output, feed_dict={myAgent.state_in:[s]})
+            a = np.random.choice(a_dist[0],p=a_dist[0])
+            a = np.argmax(a_dist == a)
+            action = one_hot(a)
+            time.sleep(0.075)
+            s1,r,d,_ = env.step(action) #Get our reward for taking an action given a bandit.
+            s1 = np.reshape(s1, (172032,))#np.reshape(s1, (57344, 3)).T
+            ep_history.append([s,action,r,s1])
+            s = s1
+            running_reward += r
+            if d == True:
+                print("Episode %s done."%i)
+                #Update the network.
+                ep_history = np.array(ep_history)
+                print(ep_history.shape)
+                break
+                # ep_history[:,2] = discount_rewards(ep_history[:,2])
+                # feed_dict = {myAgent.reward_holder:ep_history[:,2],
+                #              myAgent.action_holder:ep_history[:,1],
+                #              myAgent.state_in:np.vstack(ep_history[:,0])}
+                # grads = sess.run(myAgent.gradients, feed_dict=feed_dict)
+                # for idx,grad in enumerate(grads):
+                #     gradBuffer[idx] += grad
+        # if i % 100 == 0:
+        #     print(np.mean(total_reward[-100:]))
+        i += 1
