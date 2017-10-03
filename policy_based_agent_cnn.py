@@ -29,8 +29,18 @@ class Agent(object):
         self.state_in = tf.placeholder(shape=[None, s_size],dtype=tf.int8)
         _input_node = tf.cast(self.state_in, dtype=tf.float32)
         _input_node_scaled = tf.div(_input_node, 255.)
-        hidden = slim.fully_connected(_input_node_scaled, h_size, biases_initializer=None, activation_fn=tf.nn.relu)
-        self.output = slim.fully_connected(hidden, a_size, activation_fn=tf.nn.softmax, biases_initializer=None)
+        _input_node_scaled_reshaped = tf.reshape(_input_node_scaled, (1, 224, 256, 3))
+
+        h1 = tf.layers.conv2d(_input_node_scaled_reshaped, 32, 8, 4, activation=tf.nn.relu)
+        h2 = tf.layers.conv2d(h1, 64, 4, 2, activation=tf.nn.relu)
+        h3 = tf.layers.conv2d(h2, 64, 3, 1, activation=tf.nn.relu)
+        flat_h3 = tf.contrib.layers.flatten(h3)
+        h4 = tf.layers.dense(flat_h3, 512, activation=tf.nn.relu)
+        self.output = tf.layers.dense(h4, a_size, tf.nn.softmax)
+
+        # hidden = slim.fully_connected(_input_node_scaled, h_size, biases_initializer=None, activation_fn=tf.nn.relu)
+        # self.output = slim.fully_connected(hidden, a_size, activation_fn=tf.nn.softmax, biases_initializer=None)
+
         self.chosen_action = tf.argmax(self.output,1)
         self.reward_holder = tf.placeholder(shape=[None],dtype=tf.float32)
         self.action_holder = tf.placeholder(shape=[None],dtype=tf.int32)
@@ -71,7 +81,7 @@ with tf.Session() as sess:
         gradBuffer[ix] = grad * 0
 
     while i < total_episodes:
-        s = env.reset() #57344
+        s = env.reset() #(224, 256, 3) or 57344 flattened
         s = np.reshape(s, (172032,))#np.reshape(s, (57344, 3))
         # s = s.T # (3, 57344)
         running_reward = 0
