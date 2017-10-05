@@ -40,20 +40,3 @@ print(_input_node_scaled.get_shape())
 actions = _qvalues(_input_node_scaled)
 print(actions.get_shape())
 
-
-# observation = env.reset()
-sys.exit(0)
-# for i in range(num_episodes):
-#     env.render()
-    # action = env.action_space.sample() # your agent here (this takes random actions)
-    # action is a len 6 list of 0 or 1
-    # action = [0, 0, 0, 1, 1, 0]    # [up, left, down, right, A, B]
-    #  - An action of '1' represents a key down, and '0' a key up.
-    # - To toggle the button, you must issue a key up, then a key down.
-    # print action
-    # forward = random.choice([1,0])
-    # jump = random.choice([1,0])
-    # action = [0, 0, 0, forward, jump, 0]
-    # observation, reward, done, info = env.step(action)
-    # reward is a pos and neg float value
-    # print reward
